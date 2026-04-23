@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Spritz Reader</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0e0e0f;
+    --panel: #17181a;
+    --border: #2a2b2e;
+    --text: #e8e6e1;
+    --accent: #ff4d4d;
+    --muted: #6b6b72;
+    --word-bg: #1a1b1e;
+    --word-text: #e8e6e1;
+    --orp: #ff4d4d;
+    --guide: #2a2b2e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--text); }
+
+  main {
+    width: 100%;
+    max-width: 860px;
+    padding: 32px 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(255,77,77,0.04);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 2.4rem; margin-bottom: 12px; }
+  .upload-zone h2 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .upload-zone p { font-size: 0.8rem; color: var(--muted); }
+  .file-name {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Reader display */
+  .reader-box {
+    border-radius: 14px;
+    background: var(--word-bg);
+    border: 1px solid var(--border);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    transition: background 0.3s;
+  }
+
+  .reader-top-bar {
+    width: 100%;
+    background: rgba(0,0,0,0.2);
+    padding: 8px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .word-display {
+    padding: 48px 32px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 140px;
+    position: relative;
+}
+
+  /* ORP guide lines */
+  .orp-guides {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .guide-line {
+    width: 100%;
+    height: 1px;
+    background: var(--guide);
+  }
+
+  /* Vertical ORP indicator
+  .orp-marker {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: rgba(255,77,77,0.18);
+    pointer-events: none;
+    transition: left 0s;
+  } */
+
+  .word-wrap {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: baseline;
+    z-index: 1;
+    white-space: nowrap;
+    /* shift right so ORP letter (at 5.5ch from left) lands at visual center */
+    transform: translateX(3.5ch);
+}
+
+.word-before {
+    color: var(--word-text);
+    text-align: right;
+    width: 5ch;
+    min-width: 5ch;
+    max-width: 5ch;
+    overflow: hidden;
+    direction: rtl;
+    flex-shrink: 0;
+}
+
+.word-orp {
+    color: var(--orp);
+    position: relative;
+    width: 1ch;
+    min-width: 1ch;
+    max-width: 1ch;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.word-after {
+    color: var(--word-text);
+    text-align: left;
+    width: 12ch;
+    min-width: 12ch;
+    max-width: 12ch;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+  /* Controls */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+
+  .ctrl-group {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .ctrl-group label {
+    display: block;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .ctrl-group .value-display {
+    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    float: right;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  input[type="color"] {
+    width: 100%;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+    padding: 0;
+  }
+
+  /* Playback controls */
+  .playback {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .btn:hover { background: var(--border); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    padding: 9px 32px;
+  }
+  .btn.primary:hover { filter: brightness(1.1); }
+  .btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+
+  /* Progress bar */
+  .progress-wrap {
+    width: 100%;
+    padding: 0 20px 16px;
+  }
+  .progress-bar-bg {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  /* Status / word count */
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    padding: 0 2px;
+  }
+
+  /* Placeholder */
+  .placeholder-word {
+    color: var(--muted);
+    font-size: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  /* flash animation */
+  @keyframes flash {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.4; }
+    100% { opacity: 1; }
+  }
+  .flash { animation: flash 0.08s ease; }
+
+  /* Chapter select */
+  .chapter-nav { display: none; }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  select:hover { border-color: var(--accent); }
+  select option { background: var(--panel); }
+
+  /* Color scheme section */
+  .colors-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Spritz<span>Reader</span></div>
+  <div style="font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace">RAPID SERIAL VISUAL PRESENTATION</div>
+</header>
+
+<main>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept=".epub,.txt,.pdf" />
+    <div class="upload-icon">📖</div>
+    <h2>Drop a book here</h2>
+    <p>Supports .epub · .txt · .pdf — up to 50 MB</p>
+    <div class="file-name" id="fileName"></div>
+  </div>
+
+  <!-- Reader -->
+  <div class="reader-box" id="readerBox">
+    <div class="reader-top-bar">
+      <span id="statusLeft">No file loaded</span>
+      <span id="statusRight">— WPM</span>
+    </div>
+    <div class="word-display" id="wordDisplay">
+      <div class="orp-guides">
+        <div class="guide-line"></div>
+        <div class="guide-line"></div>
+      </div>
+      <!-- <div class="orp-marker" id="orpMarker"></div> -->
+      <div class="placeholder-word" id="wordEl">LOAD A BOOK TO BEGIN</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg" id="progressBg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+    <div class="status-row" style="padding:0 20px 14px;">
+      <span id="wordCount">0 / 0</span>
+      <span id="timeLeft">—</span>
+    </div>
+  </div>
+
+  <!-- Chapter navigation (visible only when chapters are found) -->
+  <div class="ctrl-group chapter-nav" id="chapterNav">
+    <label>Jump to Chapter</label>
+    <select id="chapterSelect">
+      <option value="">— select chapter —</option>
+    </select>
+  </div>
+
+  <!-- Playback -->
+  <div class="playback">
+    <button class="btn" id="btnRewind" disabled>⏮ Rewind</button>
+    <button class="btn" id="btnBack" disabled>← 10</button>
+    <button class="btn primary" id="btnPlay" disabled>▶ Play</button>
+    <button class="btn" id="btnFwd" disabled>10 →</button>
+    <button class="btn" id="btnSkip" disabled>Skip ⏭</button>
+  </div>
+
+  <!-- WPM -->
+  <div class="controls">
+    <div class="ctrl-group" style="grid-column: 1 / -1;">
+      <label>Words per Minute <span class="value-display" id="wpmDisplay">300</span></label>
+      <input type="range" id="wpmSlider" min="60" max="1000" step="10" value="300"/>
+    </div>
+  </div>
+
+  <!-- Colors -->
+  <div class="colors-row">
+    <div class="ctrl-group">
+      <label>Background</label>
+      <input type="color" id="colorBg" value="#1a1b1e"/>
+    </div>
+    <div class="ctrl-group">
+      <label>Word Color</label>
+      <input type="color" id="colorWord" value="#e8e6e1"/>
+    </div>
+    <div class="ctrl-group">
+      <label>ORP Letter</label>
+      <input type="color" id="colorOrp" value="#ff4d4d"/>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ─── State ────────────────────────────────────────────────────────────────
+  let words = [];
+  let idx = 0;
+  let playing = false;
+  let timer = null;
+  let wpm = 300;
+
+  // ─── ORP calculation ──────────────────────────────────────────────────────
+  // ORP = the "optimal recognition point" — roughly 30% into the word
+  function getORP(word) {
+    const len = word.length;
+    if (len === 1) return 0;
+    if (len <= 5) return 1;
+    if (len <= 9) return 2;
+    if (len <= 13) return 3;
+    return 4;
+  }
+
+  // ─── Display word ─────────────────────────────────────────────────────────
+  function displayWord(word) {
+    const orpIdx = getORP(word);
+    const before = word.slice(0, orpIdx);
+    const orp    = word[orpIdx];
+    const after  = word.slice(orpIdx + 1);
+
+    const el = document.getElementById('wordEl');
+    el.className = 'word-wrap';
+    el.innerHTML =
+      `<span class="word-before">${escHtml(before)}</span>` +
+      `<span class="word-orp">${escHtml(orp)}</span>` +
+      `<span class="word-after">${escHtml(after)}</span>`;
+
+    void el.offsetWidth; // reflow for flash
+    el.classList.add('flash');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ─── Playback ─────────────────────────────────────────────────────────────
+  function getInterval() {
+    // Slow down slightly for long words and punctuation
+    const word = words[idx] || '';
+    let mult = 1;
+    if (word.length > 8) mult = 1.2;
+    if (word.length > 12) mult = 1.4;
+    if (/[.!?]$/.test(word)) mult = 1.8;
+    else if (/[,;:]$/.test(word)) mult = 1.4;
+    return Math.round((60000 / wpm) * mult);
+  }
+
+  function step() {
+    if (idx >= words.length) { pause(); return; }
+    displayWord(words[idx]);
+    updateProgress();
+    idx++;
+    if (idx < words.length) {
+      timer = setTimeout(step, getInterval());
+    } else {
+      pause();
+    }
+  }
+
+  function play() {
+    if (!words.length) return;
+    playing = true;
+    document.getElementById('btnPlay').textContent = '⏸ Pause';
+    step();
+  }
+
+  function pause() {
+    playing = false;
+    clearTimeout(timer);
+    document.getElementById('btnPlay').textContent = '▶ Play';
+  }
+
+  function togglePlay() {
+    if (playing) pause(); else play();
+  }
+
+  function updateProgress() {
+    const pct = words.length ? (idx / words.length) * 100 : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('wordCount').textContent = `${idx} / ${words.length}`;
+    const remaining = words.length - idx;
+    const secs = Math.round(remaining / (wpm / 60));
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('timeLeft').textContent = `~${m}m ${s}s remaining`;
+    document.getElementById('statusLeft').textContent = words.length ? `"${words.slice(Math.max(0,idx-3), idx).join(' ')}"` : 'No file loaded';
+    document.getElementById('statusRight').textContent = `${wpm} WPM`;
+  }
+
+  // ─── Chapters ─────────────────────────────────────────────────────────────
+  function loadChapters(chapters) {
+    const nav = document.getElementById('chapterNav');
+    const sel = document.getElementById('chapterSelect');
+    if (!chapters || chapters.length === 0) {
+      nav.style.display = 'none';
+      return;
+    }
+    sel.innerHTML = '<option value="">— select chapter —</option>';
+    chapters.forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.word_index;
+      opt.textContent = ch.title;
+      sel.appendChild(opt);
+    });
+    nav.style.display = 'block';
+  }
+
+  document.getElementById('chapterSelect').addEventListener('change', e => {
+    const wordIdx = parseInt(e.target.value);
+    if (isNaN(wordIdx) || !words.length) return;
+    const wasPlaying = playing;
+    pause();
+    idx = wordIdx;
+    displayWord(words[idx]);
+    updateProgress();
+    e.target.value = '';  // reset so the same chapter can be re-selected
+    if (wasPlaying) play();
+  });
+
+  // ─── Upload ───────────────────────────────────────────────────────────────
+  async function uploadFile(file) {
+    document.getElementById('fileName').textContent = `Loading ${file.name}…`;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.error) { alert(data.error); document.getElementById('fileName').textContent = ''; return; }
+      words = data.words;
+      idx = 0;
+      document.getElementById('fileName').textContent = `✓ ${file.name} · ${data.total.toLocaleString()} words`;
+      setButtonsEnabled(true);
+      loadChapters(data.chapters);
+      displayWord(words[0]);
+      updateProgress();
+    } catch(e) {
+      alert('Upload failed: ' + e.message);
+      document.getElementById('fileName').textContent = '';
+    }
+  }
+
+  function setButtonsEnabled(on) {
+    ['btnPlay','btnRewind','btnBack','btnFwd','btnSkip'].forEach(id => {
+      document.getElementById(id).disabled = !on;
+    });
+  }
+
+  // ─── Color pickers ────────────────────────────────────────────────────────
+  document.getElementById('colorBg').addEventListener('input', e => {
+    document.getElementById('readerBox').style.background = e.target.value;
+    document.getElementById('wordDisplay').style.background = e.target.value;
+  });
+  document.getElementById('colorWord').addEventListener('input', e => {
+    document.documentElement.style.setProperty('--word-text', e.target.value);
+  });
+  document.getElementById('colorOrp').addEventListener('input', e => {
+    document.documentElement.style.setProperty('--orp', e.target.value);
+  });
+
+  // ─── WPM slider ───────────────────────────────────────────────────────────
+  document.getElementById('wpmSlider').addEventListener('input', e => {
+    wpm = parseInt(e.target.value);
+    document.getElementById('wpmDisplay').textContent = wpm;
+    updateProgress();
+  });
+
+  // ─── Buttons ──────────────────────────────────────────────────────────────
+  document.getElementById('btnPlay').addEventListener('click', togglePlay);
+  document.getElementById('btnRewind').addEventListener('click', () => {
+    pause(); idx = 0; displayWord(words[0]); updateProgress();
+  });
+  document.getElementById('btnBack').addEventListener('click', () => {
+    idx = Math.max(0, idx - 11);
+    if (!playing) { displayWord(words[idx]); updateProgress(); }
+  });
+  document.getElementById('btnFwd').addEventListener('click', () => {
+    idx = Math.min(words.length - 1, idx + 10);
+    if (!playing) { displayWord(words[idx]); updateProgress(); }
+  });
+  document.getElementById('btnSkip').addEventListener('click', () => {
+    idx = Math.min(words.length - 1, idx + 50);
+    if (!playing) { displayWord(words[idx]); updateProgress(); }
+  });
+
+  // Progress bar seek
+  document.getElementById('progressBg').addEventListener('click', e => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    idx = Math.floor(pct * words.length);
+    if (!playing) { displayWord(words[idx]); updateProgress(); }
+  });
+
+  // ─── File input ───────────────────────────────────────────────────────────
+  document.getElementById('fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) { pause(); uploadFile(e.target.files[0]); }
+  });
+
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) { pause(); uploadFile(e.dataTransfer.files[0]); }
+  });
+
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); if (words.length) togglePlay(); }
+    if (e.code === 'ArrowLeft')  { idx = Math.max(0, idx - 11); if (!playing) { displayWord(words[idx]); updateProgress(); } }
+    if (e.code === 'ArrowRight') { idx = Math.min(words.length-1, idx+10); if (!playing) { displayWord(words[idx]); updateProgress(); } }
+    if (e.code === 'ArrowUp')   { wpm = Math.min(1000, wpm+50); document.getElementById('wpmSlider').value = wpm; document.getElementById('wpmDisplay').textContent = wpm; }
+    if (e.code === 'ArrowDown') { wpm = Math.max(60, wpm-50);  document.getElementById('wpmSlider').value = wpm; document.getElementById('wpmDisplay').textContent = wpm; }
+  });
+</script>
+</body>
+</html>
